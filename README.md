@@ -101,4 +101,4 @@ node tests/phase2-ui.mjs
 
 ## 저장소와 이름
 
-프로젝트 임시 이름은 **오토플로우(Autoflow)** 이며 저장소는 https://github.com/gumdalf7787art/autoflow 이다. 초기 문서와 로컬 자료의 이전 이름은 개발 이력이다. 로컬 D1/R2 데이터 보존을 위해 기존 `database_name`과 `bucket_name`의 `mediflow-*` 식별자는 유지한다. 원격 리소스는 생성하지 않았으며 생성 시 Autoflow 이름을 사용할 수 있다. Git 업로드와 Cloudflare 운영 배포는 별개이며 이 저장소에는 자동 배포 워크플로를 추가하지 않았다.
+프로젝트 임시 이름은 **오토플로우(Autoflow)** 이며 저장소는 https://github.com/blueprime7787/autoflow 이다. 초기 문서와 로컬 자료의 이전 이름은 개발 이력이다. 로컬 D1/R2 데이터 보존을 위해 기존 `database_name`과 `bucket_name`의 `mediflow-*` 식별자는 유지한다. 원격 리소스는 생성하지 않았으며 생성 시 Autoflow 이름을 사용할 수 있다. Git 업로드와 Cloudflare 운영 배포는 별개이며 이 저장소에는 자동 배포 워크플로를 추가하지 않았다.
