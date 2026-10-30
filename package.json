@@ -14,22 +14,22 @@
     "api:worker": "wrangler dev --config wrangler.worker.jsonc --port 8787 --persist-to .wrangler/demo"
   },
   "dependencies": {
-    "@pdf-lib/fontkit": "^1.1.1",
-    "pdf-lib": "^1.17.1",
+    "@pdf-lib/fontkit": "1.1.1",
+    "pdf-lib": "1.17.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-router-dom": "^7.0.0"
+    "react-router-dom": "7.18.5"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261023.1",
-    "@playwright/test": "^1.64.1",
-    "@tailwindcss/vite": "^4.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "tailwindcss": "^4.0.0",
-    "typescript": "^5.9.0",
-    "vite": "^7.0.0",
-    "wrangler": "^4.0.0",
+    "@cloudflare/workers-types": "5.20261029.1",
+    "@playwright/test": "1.64.1",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "wrangler": "4.155.0",
     "esbuild": "0.28.2"
   }
 }
