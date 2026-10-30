@@ -12,7 +12,7 @@ export async function naver(req:Request,e:Env,u:any,path:string){
  if(!allowed(e,u))return json({error:'이 메일 계정에 접근할 관리자 권한이 없습니다'},403);
  e={...e,NAVER_EMAIL:e.NAVER_EMAIL?.trim(),NAVER_APP_PASSWORD:e.NAVER_APP_PASSWORD?.replace(/\s/g,'')};
  const configured=!!(e.NAVER_EMAIL&&e.NAVER_APP_PASSWORD);
- if(path==='/api/integrations'&&req.method==='GET'){const last:any=await e.DB.prepare("SELECT action,created FROM audit WHERE tenant_id=? AND action IN ('naver:collect','naver:test','naver:error') ORDER BY id DESC LIMIT 1").bind(u.tenant_id).first();return json({configured,email:e.NAVER_EMAIL||'',mode:'naver',lastRun:last||null,schedule:'수동 수집',sending:false})}
+ if(path==='/api/integrations'&&req.method==='GET'){const last:any=await e.DB.prepare("SELECT action,created FROM audit WHERE tenant_id=? AND action IN ('naver:collect','naver:test','naver:error') ORDER BY id DESC LIMIT 1").bind(u.tenant_id).first();return json({configured,email:e.NAVER_EMAIL||'',mode:'naver',lastRun:last||null,schedule:'수동 수집',sending:true})}
  if(req.method!=='POST')return json({error:'지원하지 않는 요청'},405);
  if(!configured)return json({error:'Cloudflare에 NAVER_EMAIL과 NAVER_APP_PASSWORD를 설정하고 재배포하세요'},400);
  if(!/^[^\s@]+@naver\.com$/i.test(e.NAVER_EMAIL!))return json({error:'NAVER_EMAIL은 네이버 메일 주소 전체여야 합니다'},400);
