@@ -1,9 +1,10 @@
+import{startTemporary,temporaryUser,temporaryEnabled}from'./temporary-admin';
 import{hash,password,uid,check,validPassword,limit}from'./security';
 import{workflows,quoteData,company}from'./workflows';
 import {PDFDocument,rgb} from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import {amount,transition} from './domain.mjs';
-type Env={DB:D1Database;FILES:R2Bucket;ASSETS:Fetcher;APP_MODE:string};
+type Env={DB:D1Database;FILES:R2Bucket;ASSETS:Fetcher;APP_MODE:string;TEMP_ADMIN_TENANT?:string;TEMP_ADMIN_UNTIL?:string};
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 async function audit(e:Env,u:any,action:string,target:string){await e.DB.prepare('INSERT INTO audit(tenant_id,user_id,action,target) VALUES(?,?,?,?)').bind(u.tenant_id,u.id,action,target).run()}
 async function record(e:Env,u:any,id:string){const r:any=await e.DB.prepare('SELECT * FROM records WHERE tenant_id=? AND id=?').bind(u.tenant_id,id).first();check(r,'자료를 찾을 수 없습니다');return {...r,data:JSON.parse(r.data)}}
@@ -12,10 +13,12 @@ export default {async fetch(req:Request,e:Env):Promise<Response>{const url=new U
 if(!path.startsWith('/api/'))return e.ASSETS.fetch(req);
 if(req.method!=='GET'){const origin=req.headers.get('Origin');if(origin&&origin!==url.origin)return json({error:'허용되지 않은 출처'},403)}
 if(path==='/api/setup'&&req.method==='POST'){check(e.APP_MODE==='local'&&['localhost','127.0.0.1'].includes(url.hostname),'로컬 환경에서만 가능합니다');const b:any=await req.json();check(typeof b.password==='string'&&b.password.length>=12,'12자 이상 비밀번호를 입력하세요');const n:any=await e.DB.prepare('SELECT count(*) n FROM users').first();check(n.n===0,'이미 초기화했습니다');const salt=uid(),h=await password(b.password,salt);const statements=[];for(const [tenant,name,email,role] of [['demo-a','김서연','admin@demo.local','admin'],['demo-a','이준호','staff@demo.local','staff'],['demo-b','박민지','other@demo.local','admin']])statements.push(e.DB.prepare('INSERT INTO users(id,tenant_id,email,name,role,salt,hash) VALUES(?,?,?,?,?,?,?)').bind(uid(),tenant,email,name,role,salt,h));await e.DB.batch(statements);return json({ok:true})}
+if(path==='/api/test/status')return json({enabled:temporaryEnabled(e),until:temporaryEnabled(e)?e.TEMP_ADMIN_UNTIL:null});
+if(path==='/api/test/start')return startTemporary(req,e);
 if(path==='/api/login'&&req.method==='POST'){const b:any=await req.json();check(typeof b.email==='string'&&b.email.length<=200&&typeof b.password==='string'&&b.password.length<=256);const email=b.email.trim().toLowerCase();const ip=req.headers.get('CF-Connecting-IP')||'local';if(!await limit(e.DB,'ip:'+ip,100)||!await limit(e.DB,'email:'+email,10))return json({error:'로그인 시도가 많습니다. 15분 후 다시 시도하세요'},429);const u:any=await e.DB.prepare('SELECT * FROM users WHERE email=? AND active=1').bind(email).first();const calculated=await password(b.password,u?.salt||'invalid-user-timing-salt');if(!u||calculated!==u.hash)return json({error:'이메일 또는 비밀번호를 확인하세요'},401);await e.DB.prepare('DELETE FROM login_limits WHERE key=?').bind(await hash('email:'+email)).run();const token=uid()+uid();await e.DB.prepare('INSERT INTO sessions VALUES(?,?,?)').bind(await hash(token),u.id,Date.now()+8*3600000).run();return new Response(JSON.stringify({ok:true}),{headers:{'Content-Type':'application/json','Cache-Control':'no-store','Set-Cookie':`session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${url.protocol==='https:'?'; Secure':''}`}})}
-const token=req.headers.get('Cookie')?.match(/(?:^|; )session=([^;]+)/)?.[1]||'';const u:any=await e.DB.prepare('SELECT u.id,u.tenant_id,u.name,u.email,u.role,u.must_change FROM users u JOIN sessions s ON s.user_id=u.id WHERE s.token=? AND s.expires>? AND u.active=1').bind(await hash(token),Date.now()).first();if(!u)return json({error:'로그인이 필요합니다'},401);
+const token=req.headers.get('Cookie')?.match(/(?:^|; )session=([^;]+)/)?.[1]||'';let u:any=await e.DB.prepare('SELECT u.id,u.tenant_id,u.name,u.email,u.role,u.must_change FROM users u JOIN sessions s ON s.user_id=u.id WHERE s.token=? AND s.expires>? AND u.active=1').bind(await hash(token),Date.now()).first();if(!u)u=await temporaryUser(e,await hash(token));if(!u)return json({error:'로그인이 필요합니다'},401);
 if(path==='/api/me')return json(u);
-if(path==='/api/logout'&&req.method==='POST'){await e.DB.prepare('DELETE FROM sessions WHERE token=?').bind(await hash(token)).run();return Response.json({ok:true},{headers:{'Cache-Control':'no-store','Set-Cookie':'session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'}})}
+if(path==='/api/logout'&&req.method==='POST'){await e.DB.batch([e.DB.prepare('DELETE FROM sessions WHERE token=?').bind(await hash(token)),e.DB.prepare('DELETE FROM temporary_admin_sessions WHERE token=?').bind(await hash(token))]);return Response.json({ok:true},{headers:{'Cache-Control':'no-store','Set-Cookie':'session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'}})}
 if(u.must_change&&!['/api/account/password','/api/logout','/api/me'].includes(path))return json({error:'임시 비밀번호를 변경하세요'},403);
 const extended=await workflows(req,e,u,path);if(extended)return extended;
 if(path==='/api/audit')return json((await e.DB.prepare('SELECT action,target,created FROM audit WHERE tenant_id=? ORDER BY id DESC LIMIT 100').bind(u.tenant_id).all()).results);

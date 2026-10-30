@@ -1,6 +1,6 @@
 import app from './index';
 import{check,hash,password,uid,validPassword,limit}from'./security';
-type Env={DB:D1Database;FILES:R2Bucket;ASSETS:Fetcher;APP_MODE?:string;BOOTSTRAP_TOKEN?:string};
+type Env={DB:D1Database;FILES:R2Bucket;ASSETS:Fetcher;APP_MODE?:string;BOOTSTRAP_TOKEN?:string;TEMP_ADMIN_TENANT?:string;TEMP_ADMIN_UNTIL?:string};
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 export default {async fetch(req:Request,env:Env,ctx:ExecutionContext){const url=new URL(req.url);if(!url.pathname.startsWith('/api/'))return env.ASSETS.fetch(req);try{
 if(url.pathname==='/api/health'){if(!env.DB||!env.FILES)return json({ok:false,error:'Pages에 DB(D1)와 FILES(R2) 바인딩을 연결하세요.'},503);try{await env.DB.prepare('SELECT must_change,active,version FROM users LIMIT 1').all();await env.DB.prepare('SELECT revision FROM revisions LIMIT 1').all()}catch{return json({ok:false,error:'D1 테이블 초기화가 필요합니다. 관리자에게 마이그레이션 적용을 요청하세요.',code:'MIGRATION_REQUIRED'},503)}return json({ok:true,server:'pages-functions',database:'ready',storageBinding:true})}

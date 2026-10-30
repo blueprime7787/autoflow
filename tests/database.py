@@ -22,3 +22,11 @@ c.execute("INSERT INTO sessions VALUES('session','u',9999999999999)")
 c.execute("UPDATE users SET hash='newhash' WHERE id='u'")
 assert c.execute('SELECT count(*) FROM sessions').fetchone()[0]==0
 print('PASS credential change revokes sessions in DB')
+
+c.execute("INSERT INTO temporary_admin_sessions VALUES('temporary','u',1000)")
+assert c.execute("SELECT token FROM temporary_admin_sessions WHERE token='temporary' AND expires>1001").fetchone() is None
+assert c.execute("SELECT s.token FROM temporary_admin_sessions s JOIN users u ON u.id=s.user_id WHERE u.tenant_id='other-company'").fetchone() is None
+print('PASS temporary sessions enforce expiration and company scope')
+c.execute("UPDATE users SET hash='changed-again' WHERE id='u'")
+assert c.execute('SELECT count(*) FROM temporary_admin_sessions').fetchone()[0]==0
+print('PASS administrator credential change revokes temporary sessions')
