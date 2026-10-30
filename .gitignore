@@ -1,0 +1,25 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars*
+.env*
+test-results/
+
+.local-demo-login.txt
+test-results*.png
+
+# Local credentials, data and generated outputs
+.local-*
+*.log
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.pem
+*.key
+*.p12
+*.pfx
+coverage/
+playwright-report/
+preview-*.png
+test-results.json

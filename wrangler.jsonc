@@ -1,0 +1,35 @@
+{
+  "name": "autoflow",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-29",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": [
+      "/api/*"
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mediflow-local",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "mediflow-private"
+    }
+  ],
+  "vars": {
+    "APP_MODE": "local"
+  },
+  "triggers": {
+    "crons": [
+      "0 0,3,6,9 * * *"
+    ]
+  }
+}
