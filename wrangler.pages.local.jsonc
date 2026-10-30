@@ -1,0 +1,22 @@
+{
+  "name": "autoflow",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-10-29",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "autoflow-pages-test",
+      "database_id": "00000000-0000-0000-0000-000000000002",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "autoflow-pages-test"
+    }
+  ],
+  "vars": {
+    "APP_MODE": "local"
+  }
+}

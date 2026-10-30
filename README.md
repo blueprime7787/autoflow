@@ -1,18 +1,40 @@
-# Autoflow — 의료기기 영업 워크스페이스
+# Autoflow — 오토플로우
 
-업데이트 2026-10-30: 거래처·제품 수정/보관, 견적 버전·반려·재승인, 직원·비밀번호 관리가 추가되었습니다. 최신 결과는 `05_핵심업무_확장_결과.md`를 확인하세요.
+의료기기 영업·견적 업무용 SaaS 초기 구현. React + Vite + TypeScript / Tailwind / React Router / Cloudflare Pages Functions(Workers 런타임) / D1 / 비공개 R2.
 
-React + Vite + TypeScript / React Router / Tailwind CSS / Workers REST API / D1 / R2.
+저장소: https://github.com/blueprime7787/autoflow
 
-## 현재 실행
+## 현재 배포 구조
 
-로컬 주소: http://127.0.0.1:8787
+기존 Pages 프로젝트 `autoflow`, 주소 https://autoflow-1a2.pages.dev 를 유지한다. GitHub의 main 브랜치 변경은 사용자가 설정한 Cloudflare 자동 배포를 시작한다.
 
-기존 로컬 데모 로그인 정보는 `.local-demo-login.txt`에 저장되어 있다. GitHub에는 이 파일을 포함하지 않는다. 새로 clone한 환경에서는 로그인 화면에서 데모 계정을 직접 초기화한다. 이 파일은 Git 제외 대상이며 운영 계정이 아니다. 첫 신규 실행에서는 로그인 화면의 ‘로컬 데모 계정 만들기’에서 12자 이상 비밀번호를 정한다. 관리자 `admin@demo.local`, 직원 `staff@demo.local`, 다른 회사 관리자 `other@demo.local`이 같은 데모 비밀번호로 생성된다. 테스트 계정과 실제 계정을 혼용하지 않는다.
+`npm run build`는 Vite 화면 파일과 서버 번들 `dist/_worker.js`, API 라우팅 `dist/_routes.json`을 함께 생성한다. `/api/*`는 서버로, 화면·폰트·React 경로는 정적 에셋으로 전달한다. 로그인·D1·R2를 처리하는 서버 코드는 기존 worker 모듈을 재사용한다.
 
-## 설치와 실행
+운영 Pages는 **대시보드의 바인딩 설정**을 사용한다. 루트 `wrangler.jsonc`는 Git에서 제거했고 로컬 실행 때만 생성한다. 빌드 서버에 로컬 DB 자리표시자가 적용되지 않게 한다.
 
-PowerShell에서 이 README가 있는 `샘플 작성` 폴더를 작업 위치로 사용한다. Node 24 기준.
+| Pages Binding 이름 | 실제 자원 |
+|---|---|
+| DB | autoflow_db |
+| FILES | autoflow-r2 |
+| BOOTSTRAP_TOKEN (Secret) | 최초 관리자 등록용 임의 키; Git에 포함하지 않음 |
+
+Cloudflare 빌드 설정: 빌드 명령 `npm run build`, 출력 폴더 `dist`, 루트 폴더는 저장소 루트. Pages Functions의 `/api/health`가 JSON으로 정상 응답해야 서버 연결 성공이다. 홈페이지가 열리는 것만으로 DB 연결을 판정하지 않는다.
+
+## 최초 관리자와 로그인
+
+원격 DB에는 로컬 데모 계정을 복사하지 않는다. 테이블이 준비되고 직원 계정이 없으면 사이트에 **최초 관리자 등록** 화면이 표시된다.
+
+1. 프로젝트 소유자에게 전달된 최초 등록 키를 입력한다. 현재 작업 PC에서는 Git 제외 파일 `.local-pages-bootstrap-key.txt`에 있다.
+2. 회사명·이름·이메일·12~128자 비밀번호를 본인이 입력한다.
+3. 등록 후 해당 이메일·비밀번호로 로그인한다. 등록은 DB 제약으로 한 번만 가능하다.
+
+키가 없거나 틀리면 등록할 수 없다. 이미 직원이 존재하면 관리자를 추가로 초기화할 수 없다. 관리자 등록 뒤 BOOTSTRAP_TOKEN Secret은 삭제해도 일반 로그인에 영향이 없다. 등록 키나 비밀번호를 저장소·채팅에 붙여넣지 않는다.
+
+관리자는 직원·권한 메뉴에서 직원을 생성한다. 직원 임시 비밀번호는 최초 로그인 때 변경한다. 중지·역할 변경·비밀번호 변경 시 세션이 폐기된다. 유일한 관리자 계정의 분실 복구는 별도 운영 절차가 필요하다.
+
+## 로컬 실행
+
+Node 24 기준. 이 폴더를 작업 위치로 사용한다.
 
 ```powershell
 npm ci
@@ -21,19 +43,23 @@ npm run db:init
 npm run api
 ```
 
-브라우저에서 http://127.0.0.1:8787 을 연다. 로컬 D1·R2는 `.wrangler/demo`에 유지된다. 별도 터미널에서 `npm run dev`를 실행하면 Vite 개발 서버가 API 8787로 프록시한다. Vite 주소와 API는 동일 출처 프록시를 통해 사용한다.
+http://127.0.0.1:8787 에서 실행한다. 로컬 D1/R2는 `.wrangler/pages-demo`에 유지한다. 기존 Workers 테스트 자료는 `.wrangler/demo`에 보존되어 있으며 삭제하지 않는다. 두 환경의 자료는 별개다.
 
-`wrangler.jsonc`의 DB ID는 로컬용 자리표시자다. 현재 원격 D1·R2 저장은 실행하지 않았으며 로컬 Wrangler 바인딩에서 검증했다.
+`api` 실행 도구는 `wrangler.pages.local.jsonc`를 Git 제외 루트 `wrangler.jsonc`로 복사한다. 사용자 설정 파일이 이미 다르면 덮어쓰지 않는다. Pages CLI는 임의 config 경로를 지원하지 않아 로컬에서만 표준 파일명을 사용한다.
 
-## 사용 흐름
+로컬 화면의 ‘데모 계정 만들기’에서 12자 이상 비밀번호를 정하면 admin@demo.local / staff@demo.local / other@demo.local 계정이 생성된다. 실제 Pages 도메인에서는 로컬 데모 등록을 표시하지 않고 서버도 차단한다. 기존 `.local-demo-login.txt`는 이전 Workers 로컬 환경의 값이므로 새 Pages 로컬 DB와 혼동하지 않는다.
 
-1. 거래처와 제품 등록. 제품 단가는 VAT 별도 원화 정수, 수량은 양의 정수.
-2. 제품·단가 메뉴에서 거래처별 단가 추가. 최신 등록 단가를 적용하고 이전 이력은 남긴다.
-3. 견적서에서 거래처·제품·수량을 선택. ‘품목 추가’로 최대 10개 품목 입력. 가격은 서버가 DB에서 조회하고 스냅샷으로 저장한다.
-4. 승인 요청 → 관리자 승인 → 모의 발송 → 주문 전환. 직원은 승인·발송 불가. 모의 발송은 외부 메일을 전송하지 않는다.
-5. PDF 저장을 누르면 서버가 한글 PDF를 만들고 R2에 저장한 뒤 인증 다운로드한다.
-6. 주문은 전체 납품 처리 가능. 입금은 해당 주문에 금액·입금자·원문·선택 캡처를 등록하고 관리자가 승인한다. 승인액이 주문 합계를 넘으면 차단된다.
-7. 요청함의 모의 수집은 같은 가상 메일을 중복 등록하지 않는다. 규칙 기반 분석은 제품코드와 수량만 찾고 가격을 생성하지 않는다.
+Vite 개발은 API 실행 후 별도 터미널에서 `npm run dev`. Worker 원래 실행 방식은 `npm run api:worker`와 `wrangler.worker.jsonc`에 보존했다.
+
+## 기능·보안
+
+- 고객사별 로그인·직원 관리·세션 폐기·로그인 횟수 제한.
+- 거래처·제품 수정/보관, 거래처별 단가, 서버 계산 및 견적 스냅샷.
+- 견적 수정 버전·이력·반려·재승인, 공급자·로고·직인을 포함한 한글 PDF.
+- 모의 발송, 주문 전환·전체 납품, 수동 입금 등록·승인.
+- R2 비공개 파일 및 고객사별 인증 다운로드.
+
+API 키·인증정보·테스트 자격증명·DB·파일 저장물은 Git 제외 대상이다. R2 자원 이름은 코드에서 읽는 Binding 이름 FILES와 다를 수 있다. 최초 관리자 등록 전만 Secret으로 실행할 수 있는 `/api/bootstrap/check`는 임의의 자체 점검 파일/메타데이터만 생성·확인·회수하며 기존 자료는 접근하지 않는다.
 
 ## 테스트
 
@@ -42,63 +68,33 @@ npm test
 python tests/database.py
 ```
 
-API 통합 테스트는 **비어 있는 별도 로컬 DB**가 필요하다. 사용 중인 데모 DB를 지우지 않는다. 새로운 저장 경로를 정해 아래 명령에서 동일하게 사용한다.
+Pages API 전체 회귀 검증은 새 로컬 저장 경로를 사용한다.
 
 ```powershell
-npx wrangler d1 migrations apply DB --local --persist-to .wrangler/test-fresh-01
-npx wrangler dev --port 8788 --persist-to .wrangler/test-fresh-01
+npx wrangler d1 migrations apply DB --config wrangler.pages.local.jsonc --local --persist-to .wrangler/fresh-pages-test
+# npm run api를 한 번 실행해 로컬 wrangler.jsonc가 생성된 상태에서
+npx wrangler pages dev dist --port 8791 --persist-to .wrangler/fresh-pages-test
 # 다른 터미널
-npm run test:integration
-```
-
-통합 테스트는 랜덤 비밀번호로 초기화하므로 실행 후 같은 DB에서 초기화 테스트를 반복할 수 없다. 새 경로로 새 테스트 환경을 만든다. 결과는 `test-results.json`에 저장된다. `tests/ui.mjs`는 초기화 전 데모 환경에서 실행하는 브라우저 테스트다. `tests/ui-final.mjs`는 생성된 로컬 접속 파일과 가상 제품·거래처가 있어야 한다. Playwright 브라우저가 없다면 `npx playwright install chromium`으로 설치한다.
-
-## 배포 준비와 운영 전 필수 작업
-
-현재는 개발용 샘플이다. 실제 운영 배포는 수행하지 않았다.
-
-1. Cloudflare 계정에서 별도 검증용 D1·비공개 R2를 준비하고 설정의 이름·ID를 교체한다. 검증·운영 리소스는 분리한다.
-2. `APP_MODE`를 `production`으로 설정하여 로컬 초기화 경로를 차단한다. 운영용 계정 발급·관리자 복구 절차를 확정해야 한다. 직원 등록·관리자 비밀번호 초기화·로그인 횟수 제한은 구현되었으며, 외부 초대 메일·이메일 본인확인·MFA는 별도다.
-3. 원격 마이그레이션은 검증 환경부터 적용한다. 명령 예: `npx wrangler d1 migrations apply DB --remote`. 운영 DB를 대상으로 실행하기 전 백업·대상 확인이 필요하다.
-4. `npx wrangler deploy --dry-run`으로 패키징을 확인한다. 실제 배포는 사용자 승인 후 `npx wrangler deploy`로 수행한다. 원격 리소스 생성·과금·운영 배포는 이 프로젝트 작업 중 실행하지 않았다.
-5. API 키는 `wrangler secret put`을 통한 서버 Secrets에만 등록한다. `VITE_*`, 소스, Git, 화면에 비밀번호·키를 넣지 않는다.
-6. 원격 D1/R2 접근 격리·PDF CPU·파일 무결성·복구·로그인 공격 방어를 재검증한 뒤 운영한다. 유료 Worker의 실제 CPU 사용량은 아직 측정하지 않았다.
-
-## 백업·복구 계획
-
-D1 Time Travel과 별개로 주기적 SQL export, R2 파일 목록·해시·객체 백업을 준비한다. 예: `wrangler d1 export DB --remote --output backup.sql`. 백업에는 개인정보가 있으므로 암호화·별도 권한·보존기간을 적용한다. 공유 DB를 한 고객사 때문에 전체 복원하지 않는다. 격리된 복구 환경에서 SQL과 R2 참조를 확인하고 고객사별 반영한다. 실제 원격 백업·복구 연습은 미실행이다.
-
-## 구현 제한
-
-최신 상태는 `05_핵심업무_확장_결과.md`, 초기 개발 이력은 `04_개발결과_및_제한사항.md` 참고. IMAP/SMTP·OpenAI·OCR·문자 실제 공급자 어댑터는 아직 구현하지 않았고 연결 상태·모의 메일·규칙 기반 분석만 제공한다. Cron 정의는 있으나 handler는 미연결 로그만 남긴다. 현재 이메일 스케줄이 실제 수집한다고 표시하지 않는다.
-
-PDF 폰트는 Google Fonts 저장소의 Nanum Gothic(SIL OFL), 라이선스는 `public/fonts/OFL.txt`에 포함한다.
-
-## 핵심 업무 확장 사용법 (2026-10-30)
-
-- 기존 환경은 `npm run db:init`으로 0005 마이그레이션을 적용하고 `npm run build`, `npm run api` 순으로 실행한다. 기존 거래처·제품·견적·주문은 삭제하지 않는다.
-- 거래처·제품 목록의 ‘수정’으로 정보를 바꾸고, 관리자는 ‘보관’한다. ‘보관 포함’을 켜면 보관 자료를 조회·복원할 수 있다. 과거 견적·주문은 당시 값을 유지한다.
-- 견적 ‘수정’은 현재 단가를 다시 조회하여 새 버전의 초안으로 저장한다. 수정 사유가 필수이며 이전 승인은 새 버전에 적용되지 않는다. 주문 전환이 끝난 견적은 수정할 수 없다.
-- 관리자 ‘반려’는 사유가 필수다. 반려 후 초안에서 다시 승인 요청할 수 있다. ‘버전 이력’에서 당시 수량·금액·공급자 정보와 처리 이력·승인자를 조회하고 보관본 PDF를 받는다.
-- 회사 설정에서 공급자 상세정보·PNG/JPG 로고·직인을 등록한다. 새 견적/수정 버전부터 스냅샷으로 반영하며 기존 견적을 소급 변경하지 않는다. 도입 전 작성된 견적에 공급자 정보가 없으면 PDF에 미등록으로 표시한다.
-- 직원·권한 메뉴에서 직원을 등록하고 임시 비밀번호를 안전하게 전달한다. 외부 초대 이메일은 발송하지 않는다. 최초 로그인·관리자 초기화 후 비밀번호 변경을 마쳐야 업무에 접근할 수 있다.
-- 직원 이름·역할·활성 상태를 수정할 수 있다. 중지·역할 변경·비밀번호 변경/초기화는 해당 직원의 모든 세션을 폐기한다. 마지막 활성 관리자 강등/중지는 DB에서 차단한다.
-- 내 계정에서 현재 비밀번호를 확인하고 새 비밀번호로 바꾼다. 분실 시 관리자가 본인 비밀번호를 다시 확인한 뒤 직원의 임시 비밀번호를 설정한다. 관리자 자신은 내 계정을 사용한다. 유일한 관리자 비밀번호 분실에 대한 별도 운영 복구 절차는 준비 대상이다.
-- 로그인은 이메일별 15분간 10회, IP별 100회 상한을 DB에 적용한다. 성공하면 해당 이메일 카운터를 지운다. IP 카운터는 유지한다. 회사 공용 IP 등 실제 트래픽에 맞춰 조정해야 한다.
-
-확장 통합 테스트는 새로운 저장 경로에서 실행한다.
-
-```powershell
-npx wrangler d1 migrations apply DB --local --persist-to .wrangler/phase2-fresh-01
-npx wrangler dev --port 8790 --persist-to .wrangler/phase2-fresh-01
-# 다른 터미널
-$env:TEST_URL='http://127.0.0.1:8790'
+$env:TEST_URL='http://127.0.0.1:8791'
 node tests/phase2.mjs
-node tests/phase2-ui.mjs
 ```
 
-`phase2.mjs`는 기존 API 회귀 테스트도 함께 실행한다. 브라우저 테스트는 이 테스트가 만든 `test-results/phase2-session.json`을 사용하며 실제 계정이 아닌 랜덤 로컬 테스트 자격증명만 담는다. test-results 폴더는 Git 제외 대상이다. 반복 시 데모 데이터를 삭제하지 말고 새 저장 경로를 지정한다.
+`tests/pages.mjs`는 빈 DB와 .dev.vars의 BOOTSTRAP_TOKEN이 있는 별도 Pages 서버(기본 8794)에서 초기 등록·원자성·D1·R2·API/SPA 라우팅을 검증한다. `tests/pages-ui.mjs`는 별도의 빈 로컬 DB 서버 8793 및 autoflow.localhost 주소에서 최초 등록부터 로그인·D1·R2·로그아웃을 검증한다. 재실행은 기존 데이터를 지우지 말고 새 저장 경로를 사용한다.
 
-## 저장소와 이름
+브라우저는 Playwright 사용. 필요하면 `npx playwright install chromium`. 테스트 산출물·랜덤 테스트 비밀번호는 `test-results/`에 보관하고 Git에서 제외한다.
 
-프로젝트 임시 이름은 **오토플로우(Autoflow)** 이며 저장소는 https://github.com/blueprime7787/autoflow 이다. 초기 문서와 로컬 자료의 이전 이름은 개발 이력이다. 로컬 D1/R2 데이터 보존을 위해 기존 `database_name`과 `bucket_name`의 `mediflow-*` 식별자는 유지한다. 원격 리소스는 생성하지 않았으며 생성 시 Autoflow 이름을 사용할 수 있다. Git 업로드와 Cloudflare 운영 배포는 별개이며 이 저장소에는 자동 배포 워크플로를 추가하지 않았다.
+## 마이그레이션·원격 점검
+
+원격 D1 `autoflow_db`에 0001~0006을 적용했다. 이후에도 Git 빌드는 DB 변경을 자동 실행하지 않는다. 원격 DB ID·계정을 정확하게 지정한 설정으로 `wrangler d1 migrations apply DB --config <원격설정> --remote`를 별도 실행해야 한다. 현재 작업 PC의 `.local-d1.remote.jsonc`는 Git 제외 대상이다.
+
+`node scripts/check-pages.mjs`는 기존 운영 URL에서 최초 관리자 등록 전의 D1·R2 연결을 확인한다. 로컬 등록 키가 필요하며 파일 값은 출력하지 않는다. 관리자 등록 후에는 점검 경로가 차단되므로 일반 사용자 로그인으로 동작을 확인한다.
+
+원격 백업·복구·대규모 부하 시험은 별도다. D1 Time Travel과 SQL 내보내기, R2 파일 백업을 함께 준비한다. 검증 없이 기존 고객 자료를 삭제하거나 공유 DB 전체를 되돌리지 않는다.
+
+## 남은 제한
+
+네이버 IMAP/SMTP·실제 AI·OCR·문자 연결은 미구현이다. Pages Functions는 Cron 예약 실행을 제공하지 않으므로 향후 메일 자동 수집은 별도 작업 Worker로 분리해야 한다. 현재 화면은 실제 외부 발송을 하지 않는다.
+
+PBKDF2·PDF 생성의 실제 플랜 CPU 한도, 파일 검사/고아 객체 처리, 완전한 원자적 감사로그, 운영 복구·MFA 등 상용화 보완은 별도다. 상세 기능 이력은 04·05 문서, 현재 Pages 적용 결과는 `06_Pages_연결_및_검증.md`를 확인한다.
+
+한글 PDF 폰트는 Google Fonts의 Nanum Gothic(SIL OFL), 라이선스는 public/fonts/OFL.txt.

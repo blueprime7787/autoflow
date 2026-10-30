@@ -23,3 +23,6 @@ coverage/
 playwright-report/
 preview-*.png
 test-results.json
+
+# Local Pages CLI config; production uses Dashboard bindings
+/wrangler.jsonc
