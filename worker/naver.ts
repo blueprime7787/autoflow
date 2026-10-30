@@ -1,6 +1,6 @@
 import {connect} from 'cloudflare:sockets';
 import PostalMime from 'postal-mime';
-import {Imap,quoted} from './imap';
+import {Imap,quoted,ImapRejected} from './imap';
 import {hash,limit} from './security';
 type Env={DB:D1Database;FILES:R2Bucket;NAVER_EMAIL?:string;NAVER_APP_PASSWORD?:string;NAVER_TENANT_ID?:string;TEMP_ADMIN_TENANT?:string};
 export function owner(e:Env){return e.NAVER_TENANT_ID||e.TEMP_ADMIN_TENANT}
@@ -10,6 +10,7 @@ export async function naver(req:Request,e:Env,u:any,path:string){
  if(!['/api/integrations','/api/integrations/test','/api/integrations/collect'].includes(path))return null;
  const json=(v:unknown,s=200)=>Response.json(v,{status:s,headers:{'Cache-Control':'no-store'}});
  if(!allowed(e,u))return json({error:'이 메일 계정에 접근할 관리자 권한이 없습니다'},403);
+ e={...e,NAVER_EMAIL:e.NAVER_EMAIL?.trim(),NAVER_APP_PASSWORD:e.NAVER_APP_PASSWORD?.replace(/\s/g,'')};
  const configured=!!(e.NAVER_EMAIL&&e.NAVER_APP_PASSWORD);
  if(path==='/api/integrations'&&req.method==='GET'){const last:any=await e.DB.prepare("SELECT action,created FROM audit WHERE tenant_id=? AND action IN ('naver:collect','naver:test','naver:error') ORDER BY id DESC LIMIT 1").bind(u.tenant_id).first();return json({configured,email:e.NAVER_EMAIL||'',mode:'naver',lastRun:last||null,schedule:'수동 수집',sending:false})}
  if(req.method!=='POST')return json({error:'지원하지 않는 요청'},405);
@@ -48,5 +49,5 @@ export async function naver(req:Request,e:Env,u:any,path:string){
   }
   await e.DB.prepare('INSERT INTO audit(tenant_id,user_id,action,target) VALUES(?,?,?,?)').bind(u.tenant_id,u.id,path.endsWith('/test')?'naver:test':'naver:collect',JSON.stringify({added,duplicates,skipped:skipped.length})).run();
   return json({ok:true,added,duplicates,skipped,message:path.endsWith('/test')?'네이버 로그인·수신함 연결 성공':`${added}통 저장 · 중복 ${duplicates}통 · 제외 ${skipped.length}통`});
- }catch{await e.DB.prepare("INSERT INTO audit(tenant_id,user_id,action,target) VALUES(?,?,'naver:error','connection-or-collection')").bind(u.tenant_id,u.id).run();return json({phase,error:timedOut?'연결 시간이 초과되었습니다. 일부 저장된 메일은 유지됩니다. 다시 가져오기를 누르세요.':'네이버 연결 또는 수집 실패. IMAP 사용함·앱 비밀번호·Cloudflare 설정을 확인하세요. 이미 저장된 메일은 유지됩니다.'},502)}finally{clearTimeout(timer);await socket.close().catch(()=>{})}
+ }catch(err){const serverReason=phase==='네이버 로그인'&&err instanceof ImapRejected?err.response.split(e.NAVER_APP_PASSWORD!).join('[redacted]').split(e.NAVER_EMAIL!).join('[account]').split(e.NAVER_EMAIL!.split('@')[0]).join('[account]'):undefined;await e.DB.prepare("INSERT INTO audit(tenant_id,user_id,action,target) VALUES(?,?,'naver:error','connection-or-collection')").bind(u.tenant_id,u.id).run();return json({phase,serverReason,error:timedOut?'연결 시간이 초과되었습니다. 일부 저장된 메일은 유지됩니다. 다시 가져오기를 누르세요.':'네이버 연결 또는 수집 실패. IMAP 사용함·앱 비밀번호·Cloudflare 설정을 확인하세요. 이미 저장된 메일은 유지됩니다.'},502)}finally{clearTimeout(timer);await socket.close().catch(()=>{})}
 }
