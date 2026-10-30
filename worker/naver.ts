@@ -4,6 +4,7 @@ import {Imap,quoted} from './imap';
 import {hash,limit} from './security';
 type Env={DB:D1Database;FILES:R2Bucket;NAVER_EMAIL?:string;NAVER_APP_PASSWORD?:string;NAVER_TENANT_ID?:string;TEMP_ADMIN_TENANT?:string};
 export function owner(e:Env){return e.NAVER_TENANT_ID||e.TEMP_ADMIN_TENANT}
+// Temporary and password sessions use the same company administrator permissions.
 export function allowed(e:Env,u:any){return !!owner(e)&&owner(e)===u.tenant_id&&u.role==='admin'}
 export async function naver(req:Request,e:Env,u:any,path:string){
  if(!['/api/integrations','/api/integrations/test','/api/integrations/collect'].includes(path))return null;
