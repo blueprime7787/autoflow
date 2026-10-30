@@ -17,15 +17,15 @@ export async function naver(req:Request,e:Env,u:any,path:string){
  if(!/^[^\s@]+@naver\.com$/i.test(e.NAVER_EMAIL!))return json({error:'NAVER_EMAIL은 네이버 메일 주소 전체여야 합니다'},400);
  if(!await limit(e.DB,'naver:'+u.tenant_id,10))return json({error:'15분에 10회까지 연결할 수 있습니다'},429);
  const socket=connect({hostname:'imap.naver.com',port:993},{secureTransport:'on',allowHalfOpen:false});socket.closed.catch(()=>{});
- let timedOut=false;const timer=setTimeout(()=>{timedOut=true;void socket.close().catch(()=>{})},25000);
+ let phase="TLS 연결";let timedOut=false;const timer=setTimeout(()=>{timedOut=true;void socket.close().catch(()=>{})},25000);
  try{
-  await socket.opened;const imap=new Imap(socket.readable,socket.writable);
+  await socket.opened;phase="서버 인사 응답";const imap=new Imap(socket.readable,socket.writable);
   if(!(await imap.line()).startsWith('* OK'))throw Error('네이버 초기 응답을 확인할 수 없습니다');
-  await imap.command('LOGIN '+quoted(e.NAVER_EMAIL!)+' '+quoted(e.NAVER_APP_PASSWORD!));
-  const box=await imap.command('EXAMINE INBOX');const validity=box.lines.join('\n').match(/\[UIDVALIDITY (\d+)\]/)?.[1];
+  phase='네이버 로그인';await imap.command('LOGIN '+quoted(e.NAVER_EMAIL!)+' '+quoted(e.NAVER_APP_PASSWORD!));
+  phase='수신함 열기';const box=await imap.command('EXAMINE INBOX');const validity=box.lines.join('\n').match(/\[UIDVALIDITY (\d+)\]/)?.[1];
   if(!validity)throw Error('메일함 식별정보를 확인할 수 없습니다');
   let added=0,duplicates=0;const skipped:{uid:number;reason:string}[]=[];
-  if(path.endsWith('/collect')){
+  if(path.endsWith('/collect')){phase='메일 수집·저장';
    const count=Number(box.lines.join('\n').match(/\* (\d+) EXISTS/)?.[1]||0);
    if(count){const meta=await imap.command(`FETCH ${Math.max(1,count-9)}:${count} (UID RFC822.SIZE)`);
     for(const line of meta.lines){const uid=Number(line.match(/\bUID (\d+)/)?.[1]);const size=Number(line.match(/\bRFC822.SIZE (\d+)/)?.[1]);if(!uid||!size)continue;
@@ -48,5 +48,5 @@ export async function naver(req:Request,e:Env,u:any,path:string){
   }
   await e.DB.prepare('INSERT INTO audit(tenant_id,user_id,action,target) VALUES(?,?,?,?)').bind(u.tenant_id,u.id,path.endsWith('/test')?'naver:test':'naver:collect',JSON.stringify({added,duplicates,skipped:skipped.length})).run();
   return json({ok:true,added,duplicates,skipped,message:path.endsWith('/test')?'네이버 로그인·수신함 연결 성공':`${added}통 저장 · 중복 ${duplicates}통 · 제외 ${skipped.length}통`});
- }catch{await e.DB.prepare("INSERT INTO audit(tenant_id,user_id,action,target) VALUES(?,?,'naver:error','connection-or-collection')").bind(u.tenant_id,u.id).run();return json({error:timedOut?'연결 시간이 초과되었습니다. 일부 저장된 메일은 유지됩니다. 다시 가져오기를 누르세요.':'네이버 연결 또는 수집 실패. IMAP 사용함·앱 비밀번호·Cloudflare 설정을 확인하세요. 이미 저장된 메일은 유지됩니다.'},502)}finally{clearTimeout(timer);await socket.close().catch(()=>{})}
+ }catch{await e.DB.prepare("INSERT INTO audit(tenant_id,user_id,action,target) VALUES(?,?,'naver:error','connection-or-collection')").bind(u.tenant_id,u.id).run();return json({phase,error:timedOut?'연결 시간이 초과되었습니다. 일부 저장된 메일은 유지됩니다. 다시 가져오기를 누르세요.':'네이버 연결 또는 수집 실패. IMAP 사용함·앱 비밀번호·Cloudflare 설정을 확인하세요. 이미 저장된 메일은 유지됩니다.'},502)}finally{clearTimeout(timer);await socket.close().catch(()=>{})}
 }
