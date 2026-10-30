@@ -1,3 +1,4 @@
+import{quoteSubject}from'./quote-subject.mjs';
 import{lineAmount}from'./domain.mjs';
 import{allowed}from'./naver';import{check,uid,limit}from'./security';import{quotePdf}from'./quote-pdf';import{address,mimeMail,smtpSend,SmtpFailure}from'./smtp';
 const esc=(v:any)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
@@ -8,7 +9,7 @@ export async function quoteSend(req:Request,e:any,u:any,path:string){if(path==='
 check(req.method==='POST','POST 요청만 지원합니다');check(allowed(e,u),'연결된 네이버 계정의 회사 관리자만 발송할 수 있습니다');
 const raw=await e.DB.prepare('SELECT * FROM records WHERE tenant_id=? AND id=?').bind(u.tenant_id,match[1]).first();check(raw&&raw.kind==='quote','견적서 없음');const q=JSON.parse(raw.data),b:any=await req.json();check(b.version===raw.version,'견적이 변경되었습니다. 창을 닫고 다시 확인하세요');
 let source:any;if(q.sourceMailId){const r=await e.DB.prepare("SELECT data FROM records WHERE tenant_id=? AND id=? AND kind='mail'").bind(u.tenant_id,q.sourceMailId).first();if(r)source=JSON.parse(r.data)}
-const from=(e.NAVER_EMAIL||'').trim(),to=address(b.to===undefined?(source?.from||q.email||''):String(b.to).trim()),subject=String(b.subject??(source?'Re: '+source.subject:'['+(q.company?.company||'견적 안내')+'] '+q.customer+' 견적서 안내')).trim(),note=String(b.note||'');check(subject.length>0&&subject.length<=180&&!/[\r\n]/.test(subject),'제목은 줄바꿈 없이 180자 이하로 입력하세요');check(note.length<=3000,'추가 인사말은 3000자 이하');const content=mailContent(q,note);const replyId=source?.messageId;
+const from=(e.NAVER_EMAIL||'').trim(),to=address(b.to===undefined?(source?.from||q.email||''):String(b.to).trim()),subject=String(b.subject??quoteSubject(q)).trim(),note=String(b.note||'');check(subject.length>0&&subject.length<=180&&!/[\r\n]/.test(subject),'제목은 줄바꿈 없이 180자 이하로 입력하세요');check(note.length<=3000,'추가 인사말은 3000자 이하');const content=mailContent(q,note);const replyId=source?.messageId;
 const outId='smtp-'+raw.id+'-v'+(q.revision||1),existing=await e.DB.prepare('SELECT data FROM records WHERE tenant_id=? AND id=?').bind(u.tenant_id,outId).first();const old=existing?JSON.parse(existing.data):null;
 if(match[2]==='send-preview')return Response.json({from,to,subject,note,html:content.html,attachment:q.number+'-v'+(q.revision||1)+'.pdf',reply:!!replyId,state:old?.status||null,error:old?.error||null,canSend:['draft','pending','approved'].includes(q.status)&&(!old||old.status==='failed')},{headers:{'Cache-Control':'no-store'}});
 check(b.confirm===true,'발송 확인이 필요합니다');check(['draft','pending','approved'].includes(q.status),'이미 발송했거나 발송 결과 확인이 필요한 견적입니다');check(!old||old.status==='failed','중복 발송을 차단했습니다');address(from);check(/@naver\.com$/i.test(from)&&e.NAVER_APP_PASSWORD,'네이버 메일 설정을 확인하세요');

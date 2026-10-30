@@ -9,7 +9,7 @@ function mock(mode='ok'){let count=0,body='',commands=[];globalThis.__smtpConnec
 function client(e){return(path,body={},cookie='a')=>app.fetch(new Request('https://local/api/records/q/'+path,{method:'POST',headers:{Cookie:'session='+cookie,Origin:'https://local','Content-Type':'application/json'},body:JSON.stringify(body)}),e)}
 test('real send handler: preview no send; explicit approval, tenant checks, MIME HTML/PDF, idempotency',async()=>{const{db,e,files}=fixture(),m=mock(),call=client(e);
 db.prepare("INSERT INTO records(id,tenant_id,kind,data) VALUES('source','a','mail',?)").run(JSON.stringify({from:'reply@example.invalid',subject:'문의',messageId:'<original@example.invalid>'}));db.prepare("UPDATE records SET data=json_set(data,'$.sourceMailId','source') WHERE id='q'").run();
-let r=await call('send-preview',{version:1});assert.equal(r.status,200);let preview=await r.json();assert.equal(preview.to,'reply@example.invalid');assert.equal(preview.reply,true);assert.equal(m.count,0);
+let r=await call('send-preview',{version:1});assert.equal(r.status,200);let preview=await r.json();assert.equal(preview.to,'reply@example.invalid');assert.equal(preview.reply,true);assert.equal(preview.subject,'[공급사] 장비 견적서 보내드립니다 (Q-TEST)');assert.equal(m.count,0);
 assert.equal((await call('send-email',{version:1,confirm:true},'b')).status,400);
 assert.equal((await call('send-email',{version:1})).status,400);
 assert.equal((await call('send-email',{version:1,confirm:true,to:'bad\r\nBcc: victim@example.com'})).status,400);
